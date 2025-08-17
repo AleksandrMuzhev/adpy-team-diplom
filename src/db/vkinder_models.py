@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 
 Base = declarative_base()
 
+
 class Users(Base):
     __tablename__ = 'users'
 
@@ -14,7 +15,6 @@ class Users(Base):
     age = db.Column(db.Integer)
     url_profile = db.Column(db.String(length=200), nullable=False, unique=True)
     city = db.Column(db.String(length=200))
-
 
     favorites = relationship(
         'Favorites',
@@ -48,7 +48,6 @@ class Budding(Base):
     url_profile = db.Column(db.String(length=200), nullable=False, unique=True)
     city = db.Column(db.String(length=200))
 
-
     favorites = relationship(
         'Favorites',
         back_populates='budding',
@@ -73,3 +72,15 @@ class Budding_photo(Base):
     rank_photo = db.Column(db.Integer, nullable=False)
 
     budding = relationship('Budding', back_populates='budding_photo')
+
+
+class Blacklist(Base):
+    __tablename__ = 'blacklist'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'))
+    blocked_id = db.Column(db.Integer, nullable=False)
+    block_date = db.Column(db.DateTime, server_default=func.now())
+
+    # Связь с пользователем
+    user = relationship("Users", backref="blacklists")

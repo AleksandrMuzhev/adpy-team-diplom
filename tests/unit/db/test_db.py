@@ -1,8 +1,9 @@
 import pytest
 from sqlalchemy import inspect
+
+from src.db import queries
 from src.db.db_session import Session, init_db
 from src.db.vkinder_models import Users
-from src.db import queries
 
 
 def clear_database(db):
@@ -23,6 +24,19 @@ def clear_database(db):
 
 @pytest.fixture(scope='module', autouse=True)
 def setup_database():
+    """
+    Фикстура pytest для настройки тестовой базы данных.
+
+    Действия:
+    1. Инициализирует БД (создает таблицы)
+    2. Запускает тесты (yield)
+    3. Очищает БД после завершения тестов
+
+    Scope:
+        module - выполняется один раз для всего модуля тестов
+    Autouse:
+        True - автоматически используется всеми тестами модуля
+    """
     init_db()
     yield
     session = Session()
@@ -32,7 +46,17 @@ def setup_database():
         session.close()
 
 
+# python -m pytest ./tests/unit/db/test_db.py -k test_tables_created
 def test_tables_created():
+    """
+    Проверяет, что все ожидаемые таблицы были созданы в БД.
+
+    Assertions:
+        - Таблица 'users' существует
+        - Таблица 'budding' существует
+        - Таблица 'favorites' существует
+        - Таблица 'budding_photo' существует
+    """
     inspector = inspect(Session().bind)
     tables = inspector.get_table_names()
     assert 'users' in tables
@@ -41,7 +65,19 @@ def test_tables_created():
     assert 'budding_photo' in tables
 
 
+# python -m pytest ./tests/unit/db/test_db.py -k test_add_and_get_user
 def test_add_and_get_user():
+    """
+    Тестирует добавление и получение пользователя из БД.
+
+    Arrange:
+        - Создаем тестовые данные пользователя
+    Act:
+        - Добавляем пользователя через add_user
+        - Получаем его через get_user_by_id
+    Assert:
+        - Проверяем, что пользователь был корректно сохранен и получен
+    """
     session = Session()
     try:
         user_data = {
@@ -67,7 +103,19 @@ def test_add_and_get_user():
         session.close()
 
 
+# python -m pytest ./tests/unit/db/test_db.py -k test_queries_add_user_and_related_functions
 def test_queries_add_user_and_related_functions():
+    """
+    Тестирует полный цикл работы с пользователем:
+    1. Добавление пользователя
+    2. Получение пользователя по ID
+    3. Получение пользователя по URL профиля
+
+    Assertions:
+        - Пользователь корректно добавляется
+        - Пользователь корректно извлекается
+        - Все поля сохраняются правильно
+    """
     session = Session()
     try:
         user_data = {
@@ -95,7 +143,19 @@ def test_queries_add_user_and_related_functions():
         session.close()
 
 
+# python -m pytest ./tests/unit/db/test_db.py -k test_queries_budding_and_favorites_flow
 def test_queries_budding_and_favorites_flow():
+    """
+    Тестирует полный цикл работы с кандидатами и избранным:
+    1. Добавление кандидата
+    2. Добавление в избранное
+    3. Проверка избранного
+    4. Удаление из избранного
+
+    Assertions:
+        - Все операции выполняются без ошибок
+        - Состояние БД соответствует ожиданиям на каждом этапе
+    """
     session = Session()
     try:
         budding_data = {
@@ -129,7 +189,18 @@ def test_queries_budding_and_favorites_flow():
         session.close()
 
 
+# python -m pytest ./tests/unit/db/test_db.py -k test_queries_budding_photo_and_top_photos
 def test_queries_budding_photo_and_top_photos():
+    """
+    Тестирует работу с фотографиями кандидатов:
+    1. Добавление нескольких фото
+    2. Получение топ-N фото
+    3. Проверка сортировки по рангу
+
+    Assertions:
+        - Возвращается правильное количество фото
+        - Фото отсортированы по рангу (rank_photo)
+    """
     session = Session()
     try:
         photos = [

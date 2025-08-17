@@ -1,4 +1,4 @@
-from .db_session import init_db
+from src.db.db_session import init_db
 
 if __name__ == "__main__":
     init_db()

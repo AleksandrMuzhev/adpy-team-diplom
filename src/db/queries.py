@@ -1,26 +1,30 @@
-from sqlalchemy.orm import Session
-from .vkinder_models import Users, Budding, Budding_photo, Favorites
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
+from sqlalchemy.orm import Session
+
+from .vkinder_models import Users, Budding, Budding_photo, Favorites, Blacklist
+from ..vk_api_handler import logger
 
 
 def add_user(db: Session, user: dict) -> Users:
     """
-    Добавляет нового пользователя в базу данных или обновляет существующего.
+    Добавляет нового пользователя или обновляет существующего в базе данных.
 
     Args:
-        db (Session): Активная сессия SQLAlchemy для работы с БД.
-        user (dict): Словарь с данными пользователя. Должны быть ключи:
-            'user_id', 'first_name', 'last_name', 'gender', 'age', 'url_profile', 'city'.
+        db (Session): Активная сессия SQLAlchemy
+        user (dict): Словарь с данными пользователя. Обязательные ключи:
+            - user_id: int - ID пользователя VK
+            - first_name: str
+            - last_name: str
+            - gender: str ('male'/'female'/'other')
+            - url_profile: str - ссылка на профиль
 
     Returns:
-        Users: Объект пользователя из базы (новый или обновлённый).
+        Users: Объект SQLAlchemy созданного/обновленного пользователя
 
-    Логика:
-        - Проверяем, есть ли пользователь с user_id в базе.
-        - Если есть, обновляем его поля.
-        - Если нет, создаём новую запись.
-        - Сохраняем изменения и возвращаем объект.
+    Raises:
+        SQLAlchemyError: При ошибках работы с базой данных
     """
     existing = db.query(Users).filter(Users.user_id == user['user_id']).first()
     if existing:
@@ -170,19 +174,24 @@ def remove_favorite(db: Session, user_id: int, budding_id: int) -> bool:
 
 def get_favorites_for_user(db: Session, user_id: int) -> List[Budding]:
     """
-    Получить список избранных кандидатов конкретного пользователя.
+    Получает список избранных кандидатов для указанного пользователя.
 
     Args:
-        db (Session): Сессия БД.
-        user_id (int): ID пользователя.
+        db (Session): Активная сессия SQLAlchemy
+        user_id (int): VK ID пользователя
 
     Returns:
-        List[Budding]: Список объектов Budding — кандидатов, добавленных в избранное.
+        List[Budding]: Список объектов Budding, отсортированный по дате добавления
+
+    Example:
+        >>> favorites = get_favorites_for_user(session, 123456)
+        >>> for fav in favorites:
+        ...     print(fav.first_name)
     """
     return db.query(Budding) \
-             .join(Favorites, Budding.budding_id == Favorites.budding_id) \
-             .filter(Favorites.user_id == user_id) \
-             .all()
+        .join(Favorites, Budding.budding_id == Favorites.budding_id) \
+        .filter(Favorites.user_id == user_id) \
+        .all()
 
 
 def get_top_photos_for_budding(db: Session, budding_id: int, limit: int = 3) -> List[Budding_photo]:
@@ -198,7 +207,44 @@ def get_top_photos_for_budding(db: Session, budding_id: int, limit: int = 3) -> 
         List[Budding_photo]: Список фото, отсортированных по возрастанию rank_photo.
     """
     return db.query(Budding_photo) \
-             .filter(Budding_photo.budding_id == budding_id) \
-             .order_by(Budding_photo.rank_photo) \
-             .limit(limit) \
-             .all()
+        .filter(Budding_photo.budding_id == budding_id) \
+        .order_by(Budding_photo.rank_photo) \
+        .limit(limit) \
+        .all()
+
+
+def add_to_blacklist(db: Session, user_id: int, blocked_id: int):
+    """
+    Добавляет пользователя в черный список текущего пользователя.
+
+    Args:
+        db (Session): Сессия подключения к БД
+        user_id (int): ID пользователя, который добавляет в черный список
+        blocked_id (int): ID пользователя, добавляемого в черный список
+
+    Note:
+        После добавления в черный список пользователь больше не будет появляться в результатах поиска
+    """
+    db.add(Blacklist(user_id=user_id, blocked_id=blocked_id))
+    db.commit()
+
+
+def get_blacklist(db: Session, user_id: int) -> List[int]:
+    """
+    Получает список ID пользователей в черном списке указанного пользователя.
+
+    Args:
+        db (Session): Сессия подключения к БД
+        user_id (int): ID пользователя, чей черный список запрашивается
+
+    Returns:
+        List[int]: Список ID пользователей в черном списке
+
+    Note:
+        В случае ошибки возвращает пустой список и логирует ошибку
+    """
+    try:
+        return [row.blocked_id for row in db.query(Blacklist).filter(Blacklist.user_id == user_id).all()]
+    except Exception as e:
+        logger.error(f"Error getting blacklist: {e}")
+        return []
