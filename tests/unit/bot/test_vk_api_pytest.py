@@ -24,63 +24,21 @@ class TestVKAPIHandler:
             handler.api = mock_api
             return handler
 
-    # python -m pytest ./tests/unit/bot/test_vk_api_pytest.py -k test_get_user_info_success
     def test_get_user_info_success(self, handler, mock_user_data):
-        """
-        Тестирует успешное получение данных пользователя из VK API.
-
-        Arrange:
-            - Настроен mock API с тестовыми данными пользователя
-            - Создан экземпляр VKAPIHandler
-
-        Act:
-            - Вызов get_user_info с тестовым ID
-
-        Assert:
-            - Возвращен объект VKUser
-            - Основные поля соответствуют ожидаемым
-            - Вызов API был выполнен 1 раз
-        """
+        """Тестирует успешное получение данных пользователя из VK API."""
         handler.api.users.get.return_value = [mock_user_data]
         user = handler.get_user_info(1)
         assert user.first_name == 'Test'
 
-    # python -m pytest ./tests/unit/bot/test_vk_api_pytest.py -k test_get_user_info_no_bdate
     def test_get_user_info_no_bdate(self, handler, mock_user_data):
-        """Тестирует обработку отсутствия даты рождения в профиле пользователя.
-
-        Arrange:
-            - Настроен mock API с данными пользователя без поля bdate
-            - Создан экземпляр VKAPIHandler
-
-        Act:
-            - Вызов get_user_info с тестовым ID
-
-        Assert:
-            - Возраст пользователя None
-            - Остальные поля заполнены корректно
-        """
+        """Тестирует обработку отсутствия даты рождения в профиле пользователя."""
         mock_user_data['bdate'] = None
         handler.api.users.get.return_value = [mock_user_data]
         user = handler.get_user_info(1)
         assert user.age is None
 
-    # python -m pytest ./tests/unit/bot/test_vk_api_pytest.py -k test_find_potential_matches
     def test_find_potential_matches(self, handler):
-        """
-        Тестирует поиск кандидатов с различными критериями.
-
-        Test cases:
-            - Возраст в допустимом диапазоне
-            - Совпадение по городу
-            - Открытый профиль
-            - Исключение закрытых профилей
-
-        Assert:
-            - Количество возвращенных кандидатов > 0
-            - Все профили открыты
-            - Возраст в диапазоне ±5 лет
-        """
+        """Тестирует поиск кандидатов с различными критериями."""
         handler.api.users.search.return_value = {
             'items': [{
                 'id': 1,
@@ -97,7 +55,6 @@ class TestVKAPIHandler:
                 'movies': 'action'
             }]
         }
-
         mock_user = VKUser(
             id=123,
             first_name="Test",
@@ -113,26 +70,50 @@ class TestVKAPIHandler:
                 'movies': ['action']
             }
         )
-
         matches = handler.find_potential_matches(mock_user)
         assert len(matches) == 1
         assert matches[0].id == 1
 
-    # python -m pytest ./tests/unit/bot/test_vk_api_pytest.py -k test_get_top_photos_empty
     def test_get_top_photos_empty(self, handler):
-        """Тестирует обработку случая, когда у пользователя нет фотографий.
-
-        Arrange:
-            - Настроен mock API возвращающий пустой список фотографий
-            - Создан экземпляр VKAPIHandler
-
-        Act:
-            - Вызов get_top_photos с тестовым ID
-
-        Assert:
-            - Возвращается пустой список
-            - Нет ошибок при обработке пустого результата
-        """
+        """Тестирует обработку случая, когда у пользователя нет фотографий."""
         handler.api.photos.get.return_value = {'items': []}
         photos = handler.get_top_photos(1)
         assert photos == []
+
+    def test_unlike_photo_success(self, handler):
+        """Тестирует успешное удаление лайка с фото."""
+        handler.user_api = MagicMock()
+        handler.user_api.likes.delete.return_value = {}
+
+        result = handler.unlike_photo(photo_id=123, owner_id=456)
+        assert result is True
+        handler.user_api.likes.delete.assert_called_once_with(type='photo', owner_id=456, item_id=123)
+
+    def test_unlike_photo_no_user_api(self, handler):
+        """Тестирует удаление лайка при отсутствии user_api (токена пользователя)."""
+        handler.user_api = None
+        assert handler.unlike_photo(photo_id=123, owner_id=456) is False
+
+    def test_get_all_members(self, handler):
+        """Тестирует получение всех участников группы с обработкой пагинации."""
+        handler.api.groups.getMembers.side_effect = [
+            {'items': [{'id': 1}, {'id': 2}]},
+            {'items': []}
+        ]
+        members = handler.get_all_members()
+        assert len(members) == 2
+
+    def test_get_common_interests_success(self, handler):
+        """Тестирует вычисление процента общих групп при успешном вызове."""
+        handler.api.groups.get.side_effect = [
+            {'items': {1, 2, 3}},
+            {'items': {2, 3, 4}},
+        ]
+        score = handler.get_common_interests(user_id=1, candidate_id=2)
+        assert abs(score - 2/3) < 0.01
+
+    def test_get_common_interests_exception(self, handler):
+        """Тестирует обработку исключения при получении групп (возвращает 0.0)."""
+        handler.api.groups.get.side_effect = Exception("api failure")
+        score = handler.get_common_interests(user_id=1, candidate_id=2)
+        assert score == 0

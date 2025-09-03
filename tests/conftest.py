@@ -1,6 +1,5 @@
 import os
 from unittest.mock import MagicMock, patch
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,31 +10,34 @@ from src.db.vkinder_models import Base
 
 @pytest.fixture(scope='session')
 def db_engine():
-    """Фикстура для создания тестовой базы данных в памяти.
+    """
+    Фикстура для создания тестовой базы данных в памяти.
 
     Returns:
         Engine: SQLAlchemy engine для временной SQLite базы данных.
-        Создает все таблицы перед тестами и удаляет их после завершения.
+        Создает все таблицы перед тестами.
     """
     engine = create_engine('sqlite:///:memory:')
     Base.metadata.create_all(engine)
-    return engine
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture
 def session(db_engine):
-    """Фикстура для создания изолированной сессии БД с откатом изменений.
+    """
+    Фикстура для создания изолированной сессии БД с откатом изменений.
 
     Args:
-        db_engine: Фикстура с тестовым движком БД
+        db_engine: Фикстура с тестовым движком БД.
 
     Yields:
-        Session: Новая сессия SQLAlchemy для тестов
+        Session: Новая сессия SQLAlchemy для тестов.
 
     Особенности:
-        - Все изменения откатываются после теста
-        - Каждый тест получает чистую сессию
-        - Автоматически закрывает соединение
+        - Все изменения откатываются после теста.
+        - Каждый тест получает чистую сессию.
+        - Автоматически закрывает соединение.
     """
     connection = db_engine.connect()
     transaction = connection.begin()
@@ -48,16 +50,11 @@ def session(db_engine):
 
 @pytest.fixture
 def mock_user_data():
-    """Фикстура с тестовыми данными пользователя VK.
+    """
+    Фикстура с тестовыми данными пользователя VK.
 
     Returns:
-        dict: Словарь с mock-данными профиля пользователя:
-        - id: 1
-        - Имя/фамилия
-        - Пол
-        - Город
-        - Дата рождения
-        - URL профиля
+        dict: Словарь с mock-данными профиля пользователя.
     """
     return {
         'id': 1,
@@ -72,12 +69,11 @@ def mock_user_data():
 
 @pytest.fixture
 def api_handler():
-    """Фикстура для создания тестового обработчика VK API.
+    """
+    Фикстура для создания тестового обработчика VK API.
 
     Returns:
-        VKAPIHandler: Экземпляр обработчика с мокированным:
-        - API клиентом VK
-        - Базовыми методами API
+        VKAPIHandler: Экземпляр обработчика с мокированным API клиентом.
     """
     with patch('vk_api.VkApi'):
         from src.vk_api_handler import VKAPIHandler
@@ -88,23 +84,14 @@ def api_handler():
 
 @pytest.fixture
 def bot():
-    """Фикстура для создания тестового экземпляра бота.
+    """
+    Фикстура для создания тестового экземпляра бота.
 
     Returns:
-        VKinderBot: Экземпляр бота с мокированными:
-        - API VK (messages)
-        - Обработчиком VK API
-        - Сессией БД
-
-    Особенности:
-        - Использует spec для проверки интерфейса
-        - Сохраняет оригинальную функциональность
-        - Изолирует тесты от реальных вызовов API
+        VKinderBot: Экземпляр бота с мокированными API VK, обработчиком и сессией БД.
     """
-    # Создаем полностью изолированный тестовый бот
     bot = MagicMock(spec=VKinderBot)  # Используем spec для проверки интерфейса
 
-    # Настраиваем необходимые атрибуты
     bot.api = MagicMock()
     bot.api.messages = MagicMock()
     bot.api.messages.send = MagicMock()
@@ -114,7 +101,6 @@ def bot():
 
     bot.current_candidates = {}
 
-    # Возвращаем и оригинальный бот, и мок
     real_bot = VKinderBot(os.getenv("VK_TOKEN"), os.getenv("GROUP_ID"))
     real_bot.api = bot.api
     real_bot.vk_handler = bot.vk_handler
