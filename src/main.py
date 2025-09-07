@@ -10,13 +10,12 @@ from src.vk_api_handler import VKAPIHandler
 
 load_dotenv()
 
-
 def check_token(token: str) -> bool:
     """
     Проверяет валидность токена VK API.
 
     Args:
-        token (str): Токен для проверки
+        token (str): Токен для проверки.
 
     Returns:
         bool: True если токен валиден, False при ошибке.

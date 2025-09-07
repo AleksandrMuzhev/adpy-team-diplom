@@ -8,9 +8,23 @@ from vk_api.exceptions import ApiError
 
 from pydantic import BaseModel
 
+
 logger = logging.getLogger(__name__)
 
+
 def safe_decode(data):
+    """
+    Безопасно декодирует байты в строку.
+
+    Пытается декодировать данные сначала в 'utf-8', затем в 'cp1251' с заменой ошибок.
+    Если не удаётся, возвращает str(data).
+
+    Args:
+        data (bytes): данные для декодирования.
+
+    Returns:
+        str: декодированная строка.
+    """
     try:
         return data.decode('utf-8')
     except (UnicodeDecodeError, AttributeError):
@@ -19,13 +33,39 @@ def safe_decode(data):
         except Exception:
             return str(data)
 
+
 def safe_str(obj):
+    """
+    Безопасно приводит объект к строке.
+
+    В случае UnicodeDecodeError кодирует в 'cp1251' и декодирует обратно.
+
+    Args:
+        obj: объект для преобразования в строку.
+
+    Returns:
+        str: строковое представление объекта.
+    """
     try:
         return str(obj)
     except UnicodeDecodeError:
         return str(obj).encode('cp1251', errors='replace').decode('cp1251')
 
+
 class VKUser(BaseModel):
+    """
+    Модель пользователя ВК.
+
+    Attributes:
+        id (int): ID пользователя.
+        first_name (str): имя пользователя.
+        last_name (str): фамилия пользователя.
+        age (Optional[int]): возраст пользователя.
+        city (Optional[str]): город пользователя.
+        sex (Optional[int]): пол пользователя.
+        profile_url (str): URL профиля ВК.
+        interests (Optional[Dict[str, List[str]]]): интересы пользователя.
+    """
     id: int
     first_name: str
     last_name: str
@@ -35,15 +75,48 @@ class VKUser(BaseModel):
     profile_url: str
     interests: Optional[Dict[str, List[str]]] = None
 
+
 class VKPhoto(BaseModel):
+    """
+    Модель фотографии пользователя ВК.
+
+    Attributes:
+        id (int): ID фотографии.
+        owner_id (int): ID владельца фотографии.
+        likes (int): количество лайков.
+        url (str): ссылка на фотографию.
+        attachment_str (str): строка-вложение для сообщения ВК.
+    """
     id: int
     owner_id: int
     likes: int
     url: str
     attachment_str: str
 
+
 class VKAPIHandler:
+    """
+    Класс для взаимодействия с VK API.
+
+    Использует токены группы и пользователя для доступа к методам API ВК.
+
+    Attributes:
+        group_token (str): токен группы.
+        group_id (int): ID группы.
+        user_token (Optional[str]): токен пользователя, если есть.
+    """
+
     def __init__(self, group_token: str, group_id: int, user_token: Optional[str] = None):
+        """
+        Инициализация VKAPIHandler.
+
+        Создает сессии для группы и (опционально) пользователя, а также объект longpoll.
+
+        Args:
+            group_token (str): токен группы ВК.
+            group_id (int): идентификатор группы ВК.
+            user_token (Optional[str]): токен пользователя ВК.
+        """
         self.group_token = group_token
         self.user_token = user_token
         self.group_id = group_id
@@ -65,6 +138,15 @@ class VKAPIHandler:
             self.longpoll = None
 
     def get_user_info(self, user_id: int) -> Optional[VKUser]:
+        """
+        Получает информацию о пользователе ВК по его ID.
+
+        Args:
+            user_id (int): ID пользователя.
+
+        Returns:
+            Optional[VKUser]: объект VKUser с данными пользователя или None при ошибке.
+        """
         try:
             response = self.api.users.get(
                 user_ids=user_id,
@@ -110,6 +192,15 @@ class VKAPIHandler:
             return None
 
     def find_potential_matches(self, user: VKUser) -> List[VKUser]:
+        """
+        Поиск потенциальных совпадений для данного пользователя.
+
+        Args:
+            user (VKUser): исходный пользователь.
+
+        Returns:
+            List[VKUser]: список подходящих кандидатов.
+        """
         try:
             search_params = {
                 'sex': 1 if user.sex == 2 else 2,
@@ -166,6 +257,15 @@ class VKAPIHandler:
             return []
 
     def _parse_age(self, bdate: Optional[str]) -> Optional[int]:
+        """
+        Парсит дату рождения пользователя и вычисляет возраст.
+
+        Args:
+            bdate (Optional[str]): дата рождения в формате 'DD.MM.YYYY'.
+
+        Returns:
+            Optional[int]: возраст пользователя или None, если не удалось вычислить.
+        """
         if not bdate:
             return None
         parts = bdate.split('.')
@@ -177,6 +277,16 @@ class VKAPIHandler:
         return None
 
     def like_photo(self, owner_id: int, photo_id: int) -> bool:
+        """
+        Поставить лайк фото.
+
+        Args:
+            owner_id (int): ID владельца фото.
+            photo_id (int): ID фото.
+
+        Returns:
+            bool: True, если успешно, иначе False.
+        """
         try:
             self.api.likes.add(
                 type='photo',
@@ -197,48 +307,16 @@ class VKAPIHandler:
             return False
 
     def unlike_photo(self, photo_id: int, owner_id: int) -> bool:
-        if not self.user_api:
-            return False
-        try:
-            self.user_api.likes.delete(
-                type='photo',
-                owner_id=owner_id,
-                item_id=photo_id
-            )
-            return True
-        except ApiError as e:
-            if e.code == 14:
-                captcha_sid = e.error.get('captcha_sid')
-                captcha_img = e.error.get('captcha_img')
-                logger.error(f"Captcha required during unlike_photo: SID={captcha_sid} IMG={captcha_img}")
-            else:
-                logger.error(f"VK API error during unlike_photo: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unlike photo error: {e}")
-            return False
+        """
+        Убрать лайк с фото.
 
-    def like_photo(self, owner_id: int, photo_id: int) -> bool:
-        try:
-            self.api.likes.add(
-                type='photo',
-                owner_id=owner_id,
-                item_id=photo_id
-            )
-            return True
-        except ApiError as e:
-            if e.code == 14:
-                captcha_sid = e.error.get('captcha_sid')
-                captcha_img = e.error.get('captcha_img')
-                logger.error(f"Captcha required during like_photo: SID={captcha_sid} IMG={captcha_img}")
-            else:
-                logger.error(f"VK API error during like_photo: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Like photo error: {e}")
-            return False
+        Args:
+            photo_id (int): ID фото.
+            owner_id (int): ID владельца фото.
 
-    def unlike_photo(self, photo_id: int, owner_id: int) -> bool:
+        Returns:
+            bool: True, если успешно, иначе False.
+        """
         if not self.user_api:
             return False
         try:
@@ -261,6 +339,12 @@ class VKAPIHandler:
             return False
 
     def get_all_members(self):
+        """
+        Получить список всех участников группы до 1000 человек.
+
+        Returns:
+            list: список словарей с данными участников.
+        """
         members = []
         offset = 0
         while offset < 1000:
@@ -289,6 +373,16 @@ class VKAPIHandler:
         return members
 
     def get_common_interests(self, user_id: int, candidate_id: int) -> float:
+        """
+        Вычисляет долю общих групп (интересов) между двумя пользователями ВК.
+
+        Args:
+            user_id (int): ID первого пользователя.
+            candidate_id (int): ID второго пользователя.
+
+        Returns:
+            float: доля общих групп, число от 0 до 1.
+        """
         try:
             user_groups = set(self.api.groups.get(user_id=user_id)['items'])
             candidate_groups = set(self.api.groups.get(user_id=candidate_id)['items'])

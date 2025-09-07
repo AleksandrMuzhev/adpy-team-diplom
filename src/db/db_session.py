@@ -5,24 +5,22 @@ from sqlalchemy.orm import sessionmaker
 from src.db.model_db import NAME_DB, LOGIN, PASSWORD, DB_HOST, DB_PORT
 from .vkinder_models import Base
 
-
 logger = logging.getLogger(__name__)
 
-# Указываем кодировку клиента в строке подключения
 DATABASE_URL = f"postgresql://{LOGIN}:{PASSWORD}@{DB_HOST}:{DB_PORT}/{NAME_DB}?client_encoding=utf8"
 SYSTEM_DATABASE_URL = f"postgresql://{LOGIN}:{PASSWORD}@{DB_HOST}:{DB_PORT}/postgres"
 
-
 engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)  # Создаем фабрику сессий
+Session = sessionmaker(bind=engine)
 
-
-def database_exists():
+def database_exists() -> bool:
     """
     Проверяет, существует ли база данных с именем NAME_DB.
 
+    Создаёт подключение к системной базе 'postgres' для выполнения запроса проверки существования базы.
+
     Returns:
-        bool: True, если база существует, иначе False
+        bool: True, если база существует, иначе False.
     """
     system_engine = create_engine(SYSTEM_DATABASE_URL)
     try:
@@ -40,6 +38,8 @@ def database_exists():
 def create_database():
     """
     Создает базу данных с именем NAME_DB.
+
+    Использует системное подключение с уровнем изоляции AUTOCOMMIT для выполнения SQL-команды создания базы с кодировкой UTF8.
     """
     system_engine = create_engine(SYSTEM_DATABASE_URL)
     try:
@@ -54,6 +54,8 @@ def create_database():
 def drop_database():
     """
     Удаляет базу данных с именем NAME_DB.
+
+    Перед удалением завершает активные подключения к базе.
     """
     system_engine = create_engine(SYSTEM_DATABASE_URL)
     try:
@@ -72,7 +74,10 @@ def drop_database():
 
 def init_db():
     """
-    Инициализирует структуру базы данных, создавая все таблицы, определенные в моделях SQLAlchemy.
+    Инициализирует структуру базы данных.
+
+    Создаёт все таблицы, определённые в SQLAlchemy моделях.
+    Логирует список созданных таблиц.
     """
     logger.info("Инициализация таблиц в базе...")
     Base.metadata.create_all(bind=engine)

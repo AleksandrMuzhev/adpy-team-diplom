@@ -7,6 +7,16 @@ from ..vk_api_handler import logger
 
 
 def add_user(db: Session, user: dict) -> Users:
+    """
+    Добавляет нового пользователя или обновляет существующего в базе.
+
+    Args:
+        db (Session): сессия базы данных.
+        user (dict): данные пользователя.
+
+    Returns:
+        Users: объект пользователя из базы.
+    """
     existing = db.query(Users).filter(Users.user_id == user['user_id']).first()
     if existing:
         for k, v in user.items():
@@ -23,6 +33,16 @@ def add_user(db: Session, user: dict) -> Users:
 
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[Users]:
+    """
+    Получает пользователя по ID.
+
+    Args:
+        db (Session): сессия базы данных.
+        user_id (int): ID пользователя.
+
+    Returns:
+        Optional[Users]: объект пользователя или None.
+    """
     try:
         return db.query(Users).filter(Users.user_id == user_id).first()
     except UnicodeDecodeError as e:
@@ -31,6 +51,16 @@ def get_user_by_id(db: Session, user_id: int) -> Optional[Users]:
 
 
 def get_user_by_profile_url(db: Session, url: str) -> Optional[Users]:
+    """
+    Получает пользователя по URL профиля.
+
+    Args:
+        db (Session): сессия базы данных.
+        url (str): URL профиля пользователя.
+
+    Returns:
+        Optional[Users]: объект пользователя или None.
+    """
     try:
         return db.query(Users).filter(Users.url_profile == url).first()
     except UnicodeDecodeError as e:
@@ -39,6 +69,16 @@ def get_user_by_profile_url(db: Session, url: str) -> Optional[Users]:
 
 
 def add_budding(db: Session, budding: dict) -> Budding:
+    """
+    Добавляет или обновляет запись кандидата в базе.
+
+    Args:
+        db (Session): сессия базы данных.
+        budding (dict): данные кандидата.
+
+    Returns:
+        Budding: объект кандидата.
+    """
     existing = db.query(Budding).filter(Budding.budding_id == budding['budding_id']).first()
     if existing:
         for k, v in budding.items():
@@ -55,6 +95,16 @@ def add_budding(db: Session, budding: dict) -> Budding:
 
 
 def add_budding_photo(db: Session, photo: dict) -> Budding_photo:
+    """
+    Добавляет фотографию кандидата.
+
+    Args:
+        db (Session): сессия базы данных.
+        photo (dict): данные фотографии.
+
+    Returns:
+        Budding_photo: объект фотографии.
+    """
     new = Budding_photo(**photo)
     db.add(new)
     db.commit()
@@ -63,6 +113,16 @@ def add_budding_photo(db: Session, photo: dict) -> Budding_photo:
 
 
 def get_budding_by_id(db: Session, budding_id: int) -> Optional[Budding]:
+    """
+    Получает кандидата по ID.
+
+    Args:
+        db (Session): сессия базы данных.
+        budding_id (int): ID кандидата.
+
+    Returns:
+        Optional[Budding]: объект кандидата или None.
+    """
     try:
         return db.query(Budding).filter(Budding.budding_id == budding_id).first()
     except UnicodeDecodeError as e:
@@ -71,6 +131,17 @@ def get_budding_by_id(db: Session, budding_id: int) -> Optional[Budding]:
 
 
 def add_favorite(db: Session, user_id: int, budding_id: int) -> Favorites:
+    """
+    Добавляет кандидата в избранное пользователя.
+
+    Args:
+        db (Session): сессия базы данных.
+        user_id (int): ID пользователя.
+        budding_id (int): ID кандидата.
+
+    Returns:
+        Favorites: объект избранного.
+    """
     existing = db.query(Favorites).filter(Favorites.user_id == user_id, Favorites.budding_id == budding_id).first()
     if existing:
         return existing
@@ -82,6 +153,17 @@ def add_favorite(db: Session, user_id: int, budding_id: int) -> Favorites:
 
 
 def remove_favorite(db: Session, user_id: int, budding_id: int) -> bool:
+    """
+    Удаляет кандидата из избранного пользователя.
+
+    Args:
+        db (Session): сессия базы данных.
+        user_id (int): ID пользователя.
+        budding_id (int): ID кандидата.
+
+    Returns:
+        bool: True, если удаление успешно, False если запись отсутствует.
+    """
     fav = db.query(Favorites).filter(Favorites.user_id == user_id, Favorites.budding_id == budding_id).first()
     if not fav:
         return False
@@ -91,6 +173,16 @@ def remove_favorite(db: Session, user_id: int, budding_id: int) -> bool:
 
 
 def get_favorites_for_user(db: Session, user_id: int) -> List[Budding]:
+    """
+    Получает список кандидатов, добавленных в избранное пользователя.
+
+    Args:
+        db (Session): сессия базы данных.
+        user_id (int): ID пользователя.
+
+    Returns:
+        List[Budding]: список кандидатов.
+    """
     try:
         return db.query(Budding) \
             .join(Favorites, Budding.budding_id == Favorites.budding_id) \
@@ -102,6 +194,17 @@ def get_favorites_for_user(db: Session, user_id: int) -> List[Budding]:
 
 
 def get_top_photos_for_budding(db: Session, budding_id: int, limit: int = 3) -> List[Budding_photo]:
+    """
+    Получает топ фотографий для кандидата, отсортированных по рангу.
+
+    Args:
+        db (Session): сессия базы данных.
+        budding_id (int): ID кандидата.
+        limit (int): максимальное количество фотографий.
+
+    Returns:
+        List[Budding_photo]: список фотографий.
+    """
     try:
         return db.query(Budding_photo) \
             .filter(Budding_photo.budding_id == budding_id) \
@@ -114,8 +217,15 @@ def get_top_photos_for_budding(db: Session, budding_id: int, limit: int = 3) -> 
 
 
 def add_to_blacklist(db: Session, user_id: int, blocked_id: int):
+    """
+    Добавляет пользователя в чёрный список.
+
+    Args:
+        db (Session): сессия базы данных.
+        user_id (int): ID пользователя, добавляющего в чёрный список.
+        blocked_id (int): ID пользователя, которого блокируют.
+    """
     try:
-        # Убедимся, что blocked_id - это число
         blocked_id_int = int(blocked_id)
         db.add(Blacklist(user_id=user_id, blocked_id=blocked_id_int))
         db.commit()
@@ -125,6 +235,16 @@ def add_to_blacklist(db: Session, user_id: int, blocked_id: int):
 
 
 def get_blacklist(db: Session, user_id: int) -> List[int]:
+    """
+    Получает список ID пользователей из чёрного списка.
+
+    Args:
+        db (Session): сессия базы данных.
+        user_id (int): ID пользователя.
+
+    Returns:
+        List[int]: список ID заблокированных пользователей.
+    """
     try:
         result = []
         rows = db.query(Blacklist).filter(Blacklist.user_id == user_id).all()
@@ -132,13 +252,11 @@ def get_blacklist(db: Session, user_id: int) -> List[int]:
 
         for i, row in enumerate(rows):
             try:
-                # Пробуем декодировать blocked_id, если это строка
                 if isinstance(row.blocked_id, bytes):
                     blocked_id = row.blocked_id.decode('utf-8', errors='ignore')
                 else:
                     blocked_id = row.blocked_id
 
-                # Преобразуем в int
                 blocked_id_int = int(blocked_id)
                 result.append(blocked_id_int)
             except (ValueError, TypeError, UnicodeDecodeError) as e:

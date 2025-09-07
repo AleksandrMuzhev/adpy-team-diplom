@@ -9,9 +9,7 @@ from vk_api.utils import get_random_id
 
 from src.db import queries
 from src.db.db_session import Session
-from src.db.queries import (
-    add_favorite, remove_favorite, get_favorites_for_user
-)
+from src.db.queries import add_favorite, remove_favorite, get_favorites_for_user
 from src.db.vkinder_models import Favorites
 from src.vk_api_handler import VKAPIHandler, safe_decode, safe_str
 
@@ -20,17 +18,43 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class VKinderBot:
+    """
+    Класс чат-бота VKinder для поиска пары ВКонтакте.
+
+    Использует VKAPIHandler для работы с VK API и библиотеку vk_api для общения с пользователями.
+
+    Атрибуты:
+        vk_handler (VKAPIHandler): объект обработчика VK API.
+        group_id (int): идентификатор группы ВКонтакте.
+        vk_session: сессия VK группы.
+        api: API объект для вызова методов VK.
+        longpoll: объект для получения событий longpoll.
+        current_candidates (dict): словарь текущих кандидатов для каждого пользователя.
+        current_index (dict): текущий индекс кандидата для каждого пользователя.
+    """
+
     def __init__(self, vk_handler: VKAPIHandler, group_id: int):
+        """
+        Инициализация бота.
+
+        Args:
+            vk_handler (VKAPIHandler): обработчик VK API.
+            group_id (int): ID группы ВКонтакте.
+        """
         self.vk_handler = vk_handler
         self.group_id = group_id
         self.vk_session = vk_handler.vk_session
         self.api = vk_handler.api
         self.longpoll = vk_handler.longpoll
-        self.current_candidates = {}  # {user_id: [candidates]}
-        self.current_index = {}  # {user_id: current_index}
+        self.current_candidates = {}
+        self.current_index = {}
 
     def run(self):
+        """
+        Запускает цикл прослушивания новых сообщений и вызов метода обработки событий.
+        """
         logger.info("Бот запущен")
         try:
             for event in self.longpoll.listen():
@@ -40,6 +64,15 @@ class VKinderBot:
             logger.error(f"Ошибка в цикле run: {safe_str(e)}")
 
     def send_message(self, user_id: int, message: str, keyboard=None, attachments=None):
+        """
+        Отправляет сообщение пользователю.
+
+        Args:
+            user_id (int): ID пользователя ВКонтакте.
+            message (str): текст сообщения.
+            keyboard (VkKeyboard, optional): клавиатура для сообщения.
+            attachments (str or list, optional): вложения к сообщению.
+        """
         params = {
             'user_id': user_id,
             'message': message,
@@ -56,6 +89,12 @@ class VKinderBot:
             logger.error(f"Ошибка отправки сообщения: {safe_str(e)}")
 
     def create_main_keyboard(self):
+        """
+        Создает основную клавиатуру с кнопками для пользователя.
+
+        Returns:
+            VkKeyboard: объект клавиатуры.
+        """
         try:
             keyboard = VkKeyboard(one_time=False)
             keyboard.add_button('Найти пару', VkKeyboardColor.PRIMARY)
@@ -67,6 +106,15 @@ class VKinderBot:
             logger.error(f"Ошибка создания основной клавиатуры: {safe_str(e)}")
 
     def create_candidate_keyboard(self, candidate_id: int):
+        """
+        Создает клавиатуру для взаимодействия с кандидатом.
+
+        Args:
+            candidate_id (int): ID кандидата для отображения в клавиатуре (для отладки).
+
+        Returns:
+            VkKeyboard: объект клавиатуры.
+        """
         try:
             keyboard = VkKeyboard(inline=True)
             keyboard.add_button('❤️ В избранное', color=VkKeyboardColor.POSITIVE)
@@ -83,6 +131,12 @@ class VKinderBot:
             logger.error(f"Ошибка создания клавиатуры кандидата: {safe_str(e)}")
 
     def handle_start(self, user_id: int):
+        """
+        Отправляет приветственное сообщение с основной клавиатурой.
+
+        Args:
+            user_id (int): ID пользователя ВКонтакте.
+        """
         try:
             message = (
                 "Привет! Я бот VKinder и помогу тебе найти пару.\n"
@@ -96,12 +150,26 @@ class VKinderBot:
             logger.error(f"Ошибка в handle_start: {safe_str(e)}")
 
     def handle_help(self, user_id: int):
+        """
+        Отправляет справочную информацию (делегирует handle_start).
+
+        Args:
+            user_id (int): ID пользователя.
+        """
         try:
             self.handle_start(user_id)
         except Exception as e:
             logger.error(f"Ошибка в handle_help: {safe_str(e)}")
 
     def handle_find_pair(self, user_id: int):
+        """
+        Обрабатывает запрос пользователя на поиск пары.
+
+        Обрабатывает исключения и фильтрует кандидатов из чёрного списка.
+
+        Args:
+            user_id (int): ID пользователя.
+        """
         try:
             with Session() as session:
                 blacklist_raw = queries.get_blacklist(session, user_id)
@@ -129,26 +197,38 @@ class VKinderBot:
             self.send_message(user_id, "Произошла ошибка при поиске")
 
     def handle_show_favorites(self, user_id: int):
+        """
+        Отображает список избранных кандидатов пользователя.
+
+        Args:
+            user_id (int): ID пользователя.
+        """
         try:
             with Session() as session:
                 favorites = get_favorites_for_user(session, user_id)
             if not favorites:
                 self.send_message(user_id, "У вас пока нет избранных кандидатов.", self.create_main_keyboard())
                 return
-            message = "Ваши избранные кандидаты:\\n\\n"
+            message = "Ваши избранные кандидаты:\n\n"
             for fav in favorites:
                 message += (
-                    f"{fav.first_name} {fav.last_name}\\n"
-                    f"Возраст: {fav.age}\\n"
-                    f"Город: {fav.city}\\n"
-                    f"Ссылка: {fav.url_profile}\\n\\n"
+                    f"{fav.first_name} {fav.last_name}\n"
+                    f"Возраст: {fav.age}\n"
+                    f"Город: {fav.city}\n"
+                    f"Ссылка: {fav.url_profile}\n\n"
                 )
-            self.send_message(user_id, message, self.create_favorites_keyboard())
+            self.send_message(user_id, message, self.create_main_keyboard())
         except Exception as e:
             logger.error(f"Ошибка в handle_show_favorites: {safe_str(e)}")
             self.send_message(user_id, "Ошибка при отображении избранных.", self.create_main_keyboard())
 
     def handle_add_to_favorites(self, user_id: int):
+        """
+        Добавляет текущего кандидата пользователя в избранное.
+
+        Args:
+            user_id (int): ID пользователя.
+        """
         try:
             with Session() as session:
                 if user_id not in self.current_candidates or user_id not in self.current_index:
@@ -170,9 +250,40 @@ class VKinderBot:
             logger.error(f"Ошибка в handle_add_to_favorites: {safe_str(e)}")
             self.send_message(user_id, "Ошибка при добавлении в избранное.")
 
+    def handle_remove_from_favorites(self, user_id: int):
+        """
+        Обрабатывает удаление текущего кандидата пользователя из избранного.
 
+        Args:
+            user_id (int): ID пользователя.
+        """
+        try:
+            with Session() as session:
+                if user_id not in self.current_candidates or user_id not in self.current_index:
+                    self.send_message(user_id, "Сначала найдите кандидатов.")
+                    return
+                index = self.current_index[user_id]
+                candidate = self.current_candidates[user_id][index]
+                success = remove_favorite(session, user_id, candidate.id)
+                if success:
+                    self.send_message(
+                        user_id,
+                        f"Кандидат {candidate.first_name} {candidate.last_name} удалён из избранного.",
+                        self.create_candidate_keyboard(candidate.id)
+                    )
+                else:
+                    self.send_message(user_id, "Этот кандидат не найден в избранном.")
+        except Exception as e:
+            logger.error(f"Ошибка в handle_remove_from_favorites: {safe_str(e)}")
+            self.send_message(user_id, "Ошибка при удалении из избранного.")
 
     def handle_message(self, event):
+        """
+        Обрабатывает входящие сообщения пользователей и вызывает соответствующую функцию-обработчик.
+
+        Args:
+            event: объект события VkBotLongPoll с информацией о сообщении.
+        """
         try:
             user_id = event.obj.message['from_id']
             text = event.obj.message['text'].lower()
