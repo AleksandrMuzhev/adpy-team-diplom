@@ -20,12 +20,12 @@ class Users(Base):
     """
     __tablename__ = 'users'
 
-    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False, index=True)
     first_name = db.Column(db.String(length=40), nullable=False)
     last_name = db.Column(db.String(length=40), nullable=False)
     gender = db.Column(db.String(length=7), nullable=False)
     age = db.Column(db.Integer)
-    url_profile = db.Column(db.String(length=200), nullable=False, unique=True)
+    url_profile = db.Column(db.String(length=200), nullable=False, unique=True, index=True)
     city = db.Column(db.String(length=200))
 
     favorites = relationship(
@@ -51,8 +51,8 @@ class Favorites(Base):
     __tablename__ = 'favorites'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
-    budding_id = db.Column(db.Integer, db.ForeignKey('budding.budding_id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
+    budding_id = db.Column(db.Integer, db.ForeignKey('budding.budding_id', ondelete='CASCADE'), nullable=False, index=True)
 
     add_date = db.Column(db.DateTime, server_default=func.now())
 
@@ -77,7 +77,7 @@ class Budding(Base):
     """
     __tablename__ = 'budding'
 
-    budding_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    budding_id = db.Column(db.Integer, primary_key=True, nullable=False, index=True)
     first_name = db.Column(db.String(length=40), nullable=False)
     last_name = db.Column(db.String(length=40), nullable=False)
     gender = db.Column(db.String(length=7), nullable=False)
@@ -114,7 +114,7 @@ class Budding_photo(Base):
     __tablename__ = 'budding_photo'
 
     photo_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    budding_id = db.Column(db.Integer, db.ForeignKey('budding.budding_id', ondelete='CASCADE'), nullable=False)
+    budding_id = db.Column(db.Integer, db.ForeignKey('budding.budding_id', ondelete='CASCADE'), nullable=False, index=True)
     photo_vk = db.Column(db.String(length=200), nullable=False)
     likes_count = db.Column(db.Integer)
     rank_photo = db.Column(db.Integer, nullable=False)
@@ -136,7 +136,7 @@ class Blacklist(Base):
     __tablename__ = 'blacklist'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), index=True)
     blocked_id = db.Column(db.Integer, nullable=False)
     block_date = db.Column(db.DateTime, server_default=func.now())
 

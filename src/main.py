@@ -7,6 +7,7 @@ import vk_api
 
 from src.bot import VKinderBot, logger
 from src.vk_api_handler import VKAPIHandler
+from src.db.db_session import engine
 
 load_dotenv()
 
@@ -45,25 +46,29 @@ def main():
     Raises:
         ValueError: При отсутствии VK_TOKEN или GROUP_ID в окружении.
     """
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    
+    try:
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-    group_token = os.getenv("VK_TOKEN")
-    user_token = os.getenv("USER_TOKEN")
-    group_id_str = os.getenv("GROUP_ID")
+        group_token = os.getenv("VK_TOKEN")
+        user_token = os.getenv("USER_TOKEN")
+        group_id_str = os.getenv("GROUP_ID")
 
-    if not group_token or not group_id_str:
-        raise ValueError("Необходимо указать VK_TOKEN и GROUP_ID в .env файле")
+        if not group_token or not group_id_str:
+            raise ValueError("Необходимо указать VK_TOKEN и GROUP_ID в .env файле")
 
-    if not check_token(group_token):
-        logger.error("Invalid VK_TOKEN")
-        return
+        if not check_token(group_token):
+            logger.error("Invalid VK_TOKEN")
+            return
 
-    group_id = int(group_id_str)
+        group_id = int(group_id_str)
 
-    vk_handler = VKAPIHandler(group_token=group_token, group_id=group_id, user_token=user_token)
+        vk_handler = VKAPIHandler(group_token=group_token, group_id=group_id, user_token=user_token)
 
-    bot = VKinderBot(vk_handler, group_id)
-    bot.run()
+        bot = VKinderBot(vk_handler, group_id)
+        bot.run()
+    finally:
+            engine.dispose()
 
 
 if __name__ == "__main__":
